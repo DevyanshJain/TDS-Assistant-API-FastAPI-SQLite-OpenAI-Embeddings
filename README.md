@@ -62,3 +62,6 @@ python generate_embeddings.py
 Visit your public URL:
 [https://your-app.up.railway.app/docs](https://your-app.up.railway.app/docs)
 
+### KNOWLEDGE_BASE CAN BE FOUND ON THE BELOW LINK
+
+[Knowledge_base.db](https://drive.google.com/file/d/1HZDBs6ka43tjebqwUyPy5LPf_sGBvqzy/view?usp=sharing)
