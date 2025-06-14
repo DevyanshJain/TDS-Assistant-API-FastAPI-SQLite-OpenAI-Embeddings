@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+env/
+venv/
+.venv/
+
+# IDE/editor settings
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Environment variables
+.env
+
+# SQLite backups or temp files
+*.sqlite3-journal
+
+# (Optional) Ignore all DBs *except* knowledge_base.db
+# *.db
+!knowledge_base.db
+
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints/
