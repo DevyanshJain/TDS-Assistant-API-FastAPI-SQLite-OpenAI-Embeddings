@@ -1,5 +1,7 @@
 # app.py
 import os
+if not os.path.exists("knowledge_base.db"):
+    import download_db  # This triggers download
 import json
 import sqlite3
 import numpy as np
