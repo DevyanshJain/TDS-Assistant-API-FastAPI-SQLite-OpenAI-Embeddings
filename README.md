@@ -14,6 +14,10 @@ This is an intelligent assistant built using FastAPI to answer student queries b
 
 ---
 
+This repo includes a script (discourseScrapper.py) that scrapes Discourse threads across a date range and saves them to JSON format.
+
+---
+
 ### 🧑‍💻 1. Prerequisites
 
 - GitHub account
