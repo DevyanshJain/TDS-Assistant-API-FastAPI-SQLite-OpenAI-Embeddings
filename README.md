@@ -45,7 +45,7 @@ Start command:
 uvicorn app:app --host 0.0.0.0 --port 8000
 ```
 
-###🧠 3. Embedding Data (One-Time)
+### 🧠 3. Embedding Data (One-Time)
 
 Before deploying, make sure you've:
 
@@ -57,7 +57,7 @@ Before deploying, make sure you've:
 python generate_embeddings.py
 ```
 
-###✅ 4. After Deployment
+### ✅ 4. After Deployment
 
 Visit your public URL:
 [https://your-app.up.railway.app/docs](https://your-app.up.railway.app/docs)
