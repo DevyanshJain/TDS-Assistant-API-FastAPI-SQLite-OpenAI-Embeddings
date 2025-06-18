@@ -9,6 +9,7 @@ import tempfile
 import textwrap
 from pathlib import Path
 from typing import List
+from .embed import TextEmbedding  # adjust if needed
 
 import faiss
 import numpy as np
@@ -35,12 +36,6 @@ EMBED_MODEL = "BAAI/bge-small-en-v1.5"
 TOP_K       = 6
 
 # ─── Init ──────────────────────────────────────────────────────────────
-import requests
-import sqlite3
-import json
-import faiss
-from pathlib import Path
-from .embed import TextEmbedding  # adjust if needed
 
 def download_file(url: str, dest_path: Path):
     response = requests.get(url)
