@@ -2,7 +2,7 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from dotenv import load_dotenv
-from fastapi_vercel import make_app  # ➜ NEW: tiny adapter for Vercel
+from fastapi import FastAPI
 from mangum import Mangum
 from rag import init_rag, answer_question
 
@@ -54,4 +54,4 @@ async def ask(q: Question):
 # or `vercel_app`. We export `vercel_app` so it can serve FastAPI
 # in serverless mode.
 handler = Mangum(app)
-vercel_app = make_app(app)
+app = FastAPI()
