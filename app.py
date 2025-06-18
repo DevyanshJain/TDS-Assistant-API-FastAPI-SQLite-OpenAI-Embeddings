@@ -54,4 +54,3 @@ async def ask(q: Question):
 # or `vercel_app`. We export `vercel_app` so it can serve FastAPI
 # in serverless mode.
 handler = Mangum(app)
-app = FastAPI()
