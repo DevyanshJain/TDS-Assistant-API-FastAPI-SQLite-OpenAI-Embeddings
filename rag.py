@@ -35,16 +35,41 @@ EMBED_MODEL = "BAAI/bge-small-en-v1.5"
 TOP_K       = 6
 
 # ─── Init ──────────────────────────────────────────────────────────────
-def init_rag() -> dict:
-    if not (INDEX_BIN.exists() and ID_MAP_JSON.exists()):
-        raise RuntimeError("FAISS index or ID map missing – run embed_local.py first.")
+import requests
+import sqlite3
+import json
+import faiss
+from pathlib import Path
+from .embed import TextEmbedding  # adjust if needed
 
-    conn = sqlite3.connect(DB_PATH)
+def download_file(url: str, dest_path: Path):
+    response = requests.get(url)
+    response.raise_for_status()
+    with open(dest_path, "wb") as f:
+        f.write(response.content)
+
+def init_rag() -> dict:
+    tmp_dir = Path("/tmp")
+    db_path = tmp_dir / "knowledge_base.db"
+    index_path = tmp_dir / "faiss.index"
+    id_map_path = tmp_dir / "faiss_ids.json"
+
+    DB_URL = "https://raw.githubusercontent.com/DevyanshJain/TDS-Assistant-API-FastAPI-SQLite-OpenAI-Embeddings/main/data/knowledge_base.db"
+    INDEX_URL = "https://raw.githubusercontent.com/DevyanshJain/TDS-Assistant-API-FastAPI-SQLite-OpenAI-Embeddings/main/data/faiss.index"
+    ID_MAP_URL = "https://raw.githubusercontent.com/DevyanshJain/TDS-Assistant-API-FastAPI-SQLite-OpenAI-Embeddings/main/data/faiss_ids.json"
+
+    download_file(DB_URL, db_path)
+    download_file(INDEX_URL, index_path)
+    download_file(ID_MAP_URL, id_map_path)
+
+    conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
-    index    = faiss.read_index(str(INDEX_BIN))
-    id_map   = json.loads(ID_MAP_JSON.read_text())
-    embedder = TextEmbedding(model_name=EMBED_MODEL)
+    index = faiss.read_index(str(index_path))
+    id_map = json.loads(id_map_path.read_text())
+    embedder = TextEmbedding(model_name=os.getenv("EMBED_MODEL"))
+
     return {"db": conn, "index": index, "id_map": id_map, "embed": embedder}
+
 
 
 # ─── Retrieval helper ──────────────────────────────────────────────────
