@@ -9,7 +9,7 @@ import tempfile
 import textwrap
 from pathlib import Path
 from typing import List
-from .embed import TextEmbedding  # adjust if needed
+from embed import TextEmbedding 
 
 import faiss
 import numpy as np
