@@ -1,90 +1,85 @@
-import asyncio
-import sqlite3
-import os
-import aiohttp
-import json
-import traceback
-from dotenv import load_dotenv
+#!/usr/bin/env python
+"""
+Generate local embeddings for markdown_chunks + discourse_chunks
+and write them into a FAISS index (faiss.index) — no Internet needed.
+"""
 
-# Load API key from .env
-load_dotenv()
-API_KEY = os.getenv("API_KEY")
+from __future__ import annotations
+import sqlite3, pathlib, json, numpy as np
+from fastembed import TextEmbedding
+import faiss, tqdm, gc
 
-DB_PATH = "knowledge_base.db"
-EMBEDDING_MODEL = "text-embedding-3-small"
-EMBEDDING_ENDPOINT = "https://aipipe.org/openai/v1/embeddings"
-HEADERS = {
-    "Authorization": API_KEY,
-    "Content-Type": "application/json"
-}
+# File paths and model
+DB_PATH    = pathlib.Path("knowledge_base.db")
+INDEX_PATH = pathlib.Path("faiss.index")
+ID_MAP     = pathlib.Path("faiss_ids.json")
+MODEL      = "BAAI/bge-small-en-v1.5"
 
+# Batch sizes
+EMBED_BATCH = 8         # Texts per embedding batch
+EMBED_SUB_BATCH = 2     # Real embedding sub-batch
 
-async def get_embedding(text, max_retries=3):
-    retries = 0
-    while retries < max_retries:
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    EMBEDDING_ENDPOINT,
-                    headers=HEADERS,
-                    json={"model": EMBEDDING_MODEL, "input": text}
-                ) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        return data["data"][0]["embedding"]
-                    elif response.status == 429:
-                        print(f"Rate limit hit. Retrying ({retries+1})...")
-                        await asyncio.sleep(5 * (retries + 1))
-                        retries += 1
-                    else:
-                        error_text = await response.text()
-                        print(f"Error: {response.status} --> {error_text}")
-                        return None
-        except Exception as e:
-            print(f"Exception during embedding: {e}")
-            print(traceback.format_exc().encode('ascii', 'replace').decode())
-            retries += 1
-            await asyncio.sleep(3 * retries)
-    return None
-
-
-async def process_table(table_name, id_col="id"):
+def load_rows():
+    """Load rows from markdown_chunks and discourse_chunks where text is not NULL"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
-    cursor.execute(f"SELECT {id_col}, content FROM {table_name} WHERE embedding IS NULL")
-    rows = cursor.fetchall()
+    query = """
+        SELECT id, content FROM markdown_chunks
+        UNION ALL
+        SELECT id, content FROM discourse_chunks
+        WHERE content IS NOT NULL
+    """
+    try:
+        cursor.execute(query)
+        return list(cursor.fetchall())
+    finally:
+        conn.close()
 
-    total = len(rows)
-    print(f"\n {total} rows to embed in {table_name}...")
+def batch(seq, size):
+    for i in range(0, len(seq), size):
+        yield seq[i:i + size]
 
-    for idx, (row_id, content) in enumerate(rows, 1):
-        print(f"[{table_name} {idx}/{total}] Embedding row ID: {row_id} (length: {len(content)})")
-        embedding = await get_embedding(content)
-        if embedding:
-            try:
-                cursor.execute(
-                    f"UPDATE {table_name} SET embedding = ? WHERE {id_col} = ?",
-                    (json.dumps(embedding), row_id)
-                )
-                conn.commit()
-            except Exception as db_error:
-                print(f"Failed to update row {row_id}: {db_error}")
-        else:
-            print(f"Skipped row {row_id} due to embedding error.")
-
-    conn.close()
-    print(f"Done embedding {table_name}.\n")
-
-
-async def main():
-    if not API_KEY:
-        print("API_KEY not found in .env")
+def main():
+    print("📦 Loading rows from SQLite...")
+    all_rows = load_rows()
+    if not all_rows:
+        print("❌ No rows found to embed. Exiting.")
         return
 
-    await process_table("markdown_chunks")
-    await process_table("discourse_chunks")
+    ids, texts = zip(*all_rows)
+    print(f"🔢 Total rows to embed: {len(texts)}")
 
+    embedder = TextEmbedding(model_name=MODEL)
+    vectors = []
+
+    print("🧠 Generating embeddings...")
+    for i, text_batch in enumerate(tqdm.tqdm(batch(texts, EMBED_BATCH), total=(len(texts) + EMBED_BATCH - 1)//EMBED_BATCH, desc="Embedding")):
+        try:
+            batch_vecs = list(embedder.embed(text_batch, batch_size=EMBED_SUB_BATCH))
+            vectors.extend(batch_vecs)
+        except Exception as e:
+            print(f"[!] Failed at batch {i}: {e}")
+            continue
+        gc.collect()
+
+    if not vectors:
+        print("❌ No vectors generated. Exiting.")
+        return
+
+    print("🧊 Building FAISS index...")
+    vecs = np.vstack(vectors).astype("float32")
+    index = faiss.IndexFlatIP(vecs.shape[1])
+    index.add(vecs)
+
+    # Save index
+    faiss.write_index(index, str(INDEX_PATH))
+    print(f"✅ FAISS index saved to → {INDEX_PATH}")
+
+    # Save mapping of FAISS position to DB id
+    mapping = {i: ids[i] for i in range(len(ids))}
+    ID_MAP.write_text(json.dumps(mapping, indent=2))
+    print(f"✅ ID mapping saved to → {ID_MAP}")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
